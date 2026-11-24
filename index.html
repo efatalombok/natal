@@ -54,7 +54,14 @@ input:focus{outline:none;border-color:var(--g3);box-shadow:0 0 0 4px rgba(26,92,
 .sub{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:22px 0 10px}
 .sub b{font:600 19px 'Cormorant Garamond',Georgia,serif;color:var(--g2)}
 .chip{font-size:12px;font-weight:600;color:#7A5E1E;background:#F5ECD3;padding:5px 11px;border-radius:999px;white-space:nowrap}
-.slot{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.slot{display:flex;align-items:center;gap:10px}
+.isian{margin-bottom:14px}
+.seg{display:inline-flex;margin:7px 0 0 40px;border:1px solid var(--garis);border-radius:10px;overflow:hidden;background:#fff}
+.seg button{border:0;background:none;min-height:36px;padding:0 14px;font:500 13px Montserrat,Arial,sans-serif;color:var(--abu);cursor:pointer;transition:background .2s,color .2s}
+.seg button+button{border-left:1px solid var(--garis)}
+.seg button[aria-pressed="true"]{background:linear-gradient(135deg,var(--g3),var(--g2));color:var(--krem)}
+.seg button:focus-visible{outline:2px solid var(--emas);outline-offset:-2px}
+.badge{display:inline-block;font-size:11px;font-weight:600;color:#7A5E1E;background:#F5ECD3;border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:1px}
 .no{flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--emas);display:grid;place-items:center;font:600 15px 'Cormorant Garamond',Georgia,serif;color:#8A6B22;transition:.25s}
 .no.isi{background:linear-gradient(135deg,var(--g3),var(--g2));border-color:var(--g2);color:var(--emas2)}
 .btn{display:grid;place-items:center;width:100%;height:52px;border:0;border-radius:14px;cursor:pointer;margin-top:10px;text-decoration:none;
@@ -123,6 +130,7 @@ input:focus{outline:none;border-color:var(--g3);box-shadow:0 0 0 4px rgba(26,92,
   <div>
     <h2>Kuota undangan</h2>
     <p><span id="terpakai">–</span> dari <span id="total">–</span> tempat sudah terisi</p>
+    <p id="komposisi" style="margin-top:2px;color:var(--emas2)"></p>
   </div>
 </section>
 
@@ -134,6 +142,7 @@ input:focus{outline:none;border-color:var(--g3);box-shadow:0 0 0 4px rgba(26,92,
     <input id="nama" maxlength="80" placeholder="Contoh: Yohanes Lumban">
     <p class="hint" id="namaHint">Sudah pernah mengisi? Tulis nama yang sama untuk mengubah data.</p>
     <div class="sub"><b>Yang kamu undang</b><span class="chip" id="chipSaya">Sisa 4 dari 4</span></div>
+    <p class="hint" style="margin:-4px 0 12px">Pilih Dewasa atau Anak untuk setiap nama. Anak artinya di bawah 12 tahun.</p>
     <div id="slots"></div>
     <button class="btn" id="btnSimpan" type="submit">Simpan undangan</button>
     <div class="pesan" id="pesan"></div>
@@ -168,6 +177,8 @@ input:focus{outline:none;border-color:var(--g3);box-shadow:0 0 0 4px rgba(26,92,
       <div class="stat"><small>Kuota total</small><b id="rTotal">0</b></div>
       <div class="stat"><small>Undangan terdaftar</small><b id="rPakai">0</b></div>
       <div class="stat"><small>Sisa kuota</small><b id="rSisa">0</b></div>
+      <div class="stat"><small>Dewasa</small><b id="rDewasa">0</b></div>
+      <div class="stat"><small>Anak (&lt; 12 th)</small><b id="rAnak">0</b></div>
       <div class="stat"><small>Jemaat mengisi</small><b id="rJemaat">0</b></div>
     </div>
     <button class="btn" id="btnPdf" type="button">Buat PDF rekap</button>
@@ -216,6 +227,7 @@ function renderStatus(s){
   $('sisa').textContent = s.sisa;
   $('total').textContent = s.kuotaTotal;
   $('terpakai').textContent = s.terpakai;
+  $('komposisi').textContent = s.terpakai ? s.dewasa + ' dewasa · ' + s.anak + ' anak' : '';
   const sisaFr = s.kuotaTotal ? Math.max(0, Math.min(1, s.sisa / s.kuotaTotal)) : 0;
   $('ringIsi').style.strokeDashoffset = String(KELILING * (1 - sisaFr));
   if (MODE !== 'panitia') $('lead').textContent = 'Setiap jemaat dapat mengundang hingga ' + s.kuotaJemaat + ' orang.';
@@ -226,16 +238,34 @@ function buatSlot(n){
   const box = $('slots');
   box.textContent = '';
   for (let i = 0; i < n; i++){
+    const w = document.createElement('div'); w.className = 'isian'; w.dataset.kat = 'Dewasa';
     const d = document.createElement('div'); d.className = 'slot';
     const no = document.createElement('span'); no.className = 'no'; no.textContent = i + 1;
     const inp = document.createElement('input'); inp.maxLength = 80; inp.placeholder = 'Nama undangan ' + (i + 1);
     inp.setAttribute('aria-label', 'Nama undangan ' + (i + 1));
     inp.addEventListener('input', hitung);
-    d.append(no, inp); box.append(d);
+    d.append(no, inp);
+    const seg = document.createElement('div'); seg.className = 'seg'; seg.setAttribute('role', 'group');
+    seg.setAttribute('aria-label', 'Kategori undangan ' + (i + 1));
+    [['Dewasa', 'Dewasa'], ['Anak', 'Anak (< 12 th)']].forEach(([v, teks]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.dataset.v = v; b.textContent = teks;
+      b.addEventListener('click', () => setKat(w, v));
+      seg.append(b);
+    });
+    w.append(d, seg); box.append(w);
+    setKat(w, 'Dewasa');
   }
   hitung();
 }
-function slotInputs(){ return [...$('slots').querySelectorAll('input')]; }
+function setKat(w, v){
+  w.dataset.kat = v === 'Anak' ? 'Anak' : 'Dewasa';
+  w.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === w.dataset.kat)));
+}
+function slotInputs(){ return [...$('slots').querySelectorAll('.slot input')]; }
+function isian(){ return [...$('slots').querySelectorAll('.isian')]; }
+function isiSlot(list){
+  isian().forEach((w, i) => { const u = list[i]; w.querySelector('input').value = u ? u.nama : ''; setKat(w, u ? u.kat : 'Dewasa'); });
+}
 function hitung(){
   const ins = slotInputs(); let isi = 0;
   ins.forEach(inp => { const ada = inp.value.trim() !== ''; if (ada) isi++; inp.previousSibling.classList.toggle('isi', ada); });
@@ -258,11 +288,11 @@ async function cariNama(){
     const ins = slotInputs();
     if (r.ada){
       punyaLama = true;
-      ins.forEach((inp, i) => inp.value = r.undangan[i] || '');
+      isiSlot(r.undangan);
       $('namaHint').textContent = 'Data atas nama ini sudah ada. Ubah lalu simpan, atau kosongkan semua untuk membatalkan.';
       $('btnSimpan').textContent = 'Simpan perubahan';
     } else {
-      if (punyaLama) ins.forEach(inp => inp.value = '');
+      if (punyaLama) isiSlot([]);
       punyaLama = false; resetNama();
     }
     hitung();
@@ -273,9 +303,9 @@ $('form').addEventListener('submit', async ev => {
   ev.preventDefault();
   pesan($('pesan'), '');
   const nama = $('nama').value.trim();
-  const und = slotInputs().map(i => i.value.trim());
+  const und = isian().map(w => ({ nama: w.querySelector('input').value.trim(), kat: w.dataset.kat }));
   if (nama.length < 2){ pesan($('pesan'), 'Tulis nama kamu dulu.'); $('nama').focus(); return; }
-  if (!und.some(Boolean) && !punyaLama){ pesan($('pesan'), 'Isi minimal satu nama undangan.'); return; }
+  if (!und.some(u => u.nama) && !punyaLama){ pesan($('pesan'), 'Isi minimal satu nama undangan.'); return; }
   const b = $('btnSimpan'); const label = b.textContent; b.disabled = true; b.textContent = 'Menyimpan…';
   try {
     const r = await run('simpan', nama, und);
@@ -284,7 +314,11 @@ $('form').addEventListener('submit', async ev => {
     $('okSub').textContent = r.dihapus ? 'Data atas nama ' + r.nama + ' sudah dihapus.'
       : (r.diubah ? 'Perubahan tersimpan. ' : '') + r.undangan.length + ' undangan tercatat atas nama ' + r.nama + '.';
     const ul = $('okList'); ul.textContent = '';
-    r.undangan.forEach(u => { const li = document.createElement('li'); li.textContent = u; ul.append(li); });
+    r.undangan.forEach(u => {
+      const li = document.createElement('li'); li.textContent = u.nama;
+      if (u.kat === 'Anak'){ const b = document.createElement('span'); b.className = 'badge'; b.textContent = 'Anak'; li.append(b); }
+      ul.append(li);
+    });
     show('vOk');
   } catch (e) {
     pesan($('pesan'), errTeks(e));
@@ -294,7 +328,7 @@ $('form').addEventListener('submit', async ev => {
 
 $('btnLagi').addEventListener('click', () => {
   $('nama').value = ''; namaTerakhir = ''; punyaLama = false;
-  slotInputs().forEach(i => i.value = '');
+  isiSlot([]);
   resetNama(); hitung(); pesan($('pesan'), '');
   if (!st.buka){ show('vTutup'); return; }
   show('vForm');
@@ -314,26 +348,29 @@ function tampilRekap(r){
   renderStatus(r.status); semua = r.data;
   $('rTotal').textContent = r.status.kuotaTotal; $('rPakai').textContent = r.status.terpakai;
   $('rSisa').textContent = r.status.sisa; $('rJemaat').textContent = r.status.jumlahJemaat;
+  $('rDewasa').textContent = r.status.dewasa; $('rAnak').textContent = r.status.anak;
   isiDaftar();
 }
 function isiDaftar(){
   const q = $('cariRekap').value.trim().toLowerCase();
   const box = $('daftar'); box.textContent = '';
-  const list = semua.filter(x => !q || (x.nama + ' ' + x.u.join(' ')).toLowerCase().includes(q));
+  const list = semua.filter(x => !q || (x.nama + ' ' + x.u.map(u => u.nama).join(' ')).toLowerCase().includes(q));
   if (!list.length){ const p = document.createElement('p'); p.className = 'muat'; p.textContent = semua.length ? 'Tidak ada yang cocok.' : 'Belum ada jemaat yang mengisi.'; box.append(p); return; }
   list.forEach((x, i) => {
     const row = document.createElement('div'); row.className = 'baris';
     const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1;
     const t = document.createElement('div'); t.className = 't';
     const nm = document.createElement('b'); nm.textContent = x.nama;
-    const j = document.createElement('span'); j.className = 'j'; j.textContent = ' · ' + x.u.length + ' orang';
+    const nAnak = x.u.filter(u => u.kat === 'Anak').length;
+    const j = document.createElement('span'); j.className = 'j'; j.textContent = ' · ' + x.u.length + ' orang' + (nAnak ? ' (' + nAnak + ' anak)' : '');
     const tags = document.createElement('div'); tags.className = 'tags';
     x.u.forEach(u => {
       const tag = document.createElement('span'); tag.className = 'tag';
-      const s = document.createElement('span'); s.textContent = u;
+      const s = document.createElement('span'); s.textContent = u.nama;
+      if (u.kat === 'Anak'){ const bd = document.createElement('span'); bd.className = 'badge'; bd.textContent = 'Anak'; s.append(bd); }
       const b = document.createElement('button'); b.type = 'button'; b.textContent = '×';
-      b.setAttribute('aria-label', 'Hapus ' + u);
-      b.addEventListener('click', () => duaKali(b, 'Hapus?', () => jalankanHapus(x.nama, u, 'Undangan ' + u + ' dihapus.')));
+      b.setAttribute('aria-label', 'Hapus ' + u.nama);
+      b.addEventListener('click', () => duaKali(b, 'Hapus?', () => jalankanHapus(x.nama, u.nama, 'Undangan ' + u.nama + ' dihapus.')));
       tag.append(s, b); tags.append(tag);
     });
     const w = document.createElement('div'); w.className = 'w'; w.textContent = x.waktu ? 'Diisi ' + x.waktu : '';
